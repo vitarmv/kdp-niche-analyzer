@@ -2,36 +2,26 @@ import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 
-def buscar_en_amazon(palabra_clave):
+def buscar_en_amazon(palabra_clave, scraper_api_key):
     """
-    Busca en Amazon utilizando ScraperAPI para evadir el error 503.
+    Busca en Amazon utilizando ScraperAPI. Recibe la API key como parámetro por seguridad.
     """
-    # 1. Preparamos la URL de Amazon
     keyword_url = palabra_clave.replace(' ', '+')
     amazon_url = f"https://www.amazon.com/s?k={keyword_url}&i=stripbooks"
     
-    # 2. Tu API Key de ScraperAPI (Pega tu clave real aquí)
-    SCRAPERAPI_KEY = "d5e46a0bd2af0cde693ed63fac2e77e0"
-    
-    # 3. Configuramos la petición para que pase por el túnel
     payload = {
-        'api_key': SCRAPERAPI_KEY,
+        'api_key': scraper_api_key,
         'url': amazon_url,
-        'country_code': 'us' # Forzamos a que busque en Amazon USA
+        'country_code': 'us'
     }
 
     try:
-        # Hacemos la petición a ScraperAPI, no directamente a Amazon
-        # Le damos un timeout de 20 segundos porque a veces los proxies tardan un poco
         respuesta = requests.get('https://api.scraperapi.com/', params=payload, timeout=20)
         
         if respuesta.status_code != 200:
             return {"error": f"Fallo en ScraperAPI. Código: {respuesta.status_code}"}
             
-        # Analizamos el HTML que nos devolvió ScraperAPI
         soup = BeautifulSoup(respuesta.content, 'html.parser')
-        
-        # Buscamos los libros
         libros = soup.find_all('div', {'data-component-type': 's-search-result'})
         
         resultados = []
