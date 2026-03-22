@@ -1,7 +1,7 @@
 from google import genai
 
 # ¡Reemplaza el texto entre comillas con tu clave real!
-API_KEY = "AIzaSyCiXYjDMgxRSJJdBiavreEhLYVRf5r2xTc"
+API_KEY = "AIzaSyBtoo_v_MN3MLb8VaotV2CFpB3GwgeAdC0"
 
 print("🔍 Buscando modelos disponibles en tu cuenta...\n")
 
