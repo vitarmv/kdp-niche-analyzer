@@ -4,83 +4,101 @@ from google.genai import types
 import pandas as pd
 import json
 
-# 1. Configuración básica de la página
+# IMPORTANTE: Importamos tu módulo scraper
+from scraper_amazon import buscar_en_amazon
+
+# Configuración básica
 st.set_page_config(page_title="KDP Analyzer - Océanos Azules", layout="wide")
-
 st.title("🌊 Buscador de Océanos Azules KDP")
-st.markdown("Generador de subnichos hiper-específicos usando Inteligencia Artificial (Gemini 2.5 Pro).")
 
-# 2. Panel lateral para configuración e inputs
+# Inicializar la memoria de Streamlit para no perder la tabla al hacer clic en otros botones
+if "df_ideas" not in st.session_state:
+    st.session_state.df_ideas = None
+
 with st.sidebar:
-    st.header("Configuración")
-    
-    # Pedimos la API Key por pantalla
+    st.header("⚙️ Configuración Fase 1")
     api_key = st.text_input("Ingresa tu API Key de Gemini:", type="password")
     
     if not api_key:
-        st.warning("Por favor, ingresa tu API Key de AI Studio para continuar.")
+        st.warning("Por favor, ingresa tu API Key para continuar.")
         st.stop()
     
     st.divider()
-    
-    # Inputs de búsqueda
     macro_nicho = st.text_input("Macro-Nicho a explorar:", value="Ansiedad Infantil")
-    cantidad = st.slider("Cantidad de ideas a generar", min_value=3, max_value=15, value=5)
-    buscar_btn = st.button("Buscar Oportunidades", type="primary")
+    cantidad = st.slider("Cantidad de ideas a generar", min_value=3, max_value=10, value=5)
+    buscar_btn = st.button("1. Generar Oportunidades (IA)", type="primary")
 
-# 3. Lógica principal al presionar el botón
+# --- FASE 1: GENERACIÓN CON IA ---
 if buscar_btn:
-    with st.spinner(f"🧠 Analizando variables de mercado para '{macro_nicho}' con Gemini 2.5 Pro..."):
+    with st.spinner(f"🧠 Analizando variables para '{macro_nicho}' con Gemini 2.5 Pro..."):
         try:
-            # Inicializamos el cliente con la nueva librería
             client = genai.Client(api_key=api_key)
-            
-            # El Prompt maestro forzando la estructura JSON
             prompt = f"""
-            Actúa como un experto en análisis de datos de Amazon KDP.
-            Quiero encontrar "Océanos Azules" para el macro-nicho: "{macro_nicho}".
-            
-            Genera {cantidad} ideas de subnichos (long-tail keywords) cruzando variables como demografía, problemas específicos y formatos de publicación.
-            
-            CRÍTICO: Devuelve ÚNICAMENTE un array JSON válido, sin texto markdown. Estructura exacta:
+            Actúa como experto en Amazon KDP. Encuentra "Océanos Azules" para: "{macro_nicho}".
+            Genera {cantidad} ideas de subnichos (long-tail keywords).
+            Devuelve ÚNICAMENTE un array JSON válido. Estructura exacta:
             [
               {{
-                "palabra_clave_sugerida": "ejemplo de keyword",
-                "angulo_diferenciador": "por qué esto es diferente",
-                "formato_ideal": "ej. Tapa Blanda (Libro de Trabajo)",
-                "perfil_competidor_a_vencer": "qué debilidades tendrían los competidores actuales"
+                "palabra_clave_sugerida": "keyword",
+                "angulo_diferenciador": "diferencia",
+                "formato_ideal": "formato",
+                "perfil_competidor_a_vencer": "debilidad"
               }}
             ]
             """
-            
-            # Llamamos al modelo 2.5 Pro
             response = client.models.generate_content(
                 model='gemini-2.5-pro',
                 contents=prompt,
-                config=types.GenerateContentConfig(
-                    temperature=0.7,
-                    response_mime_type="application/json",
-                )
+                config=types.GenerateContentConfig(temperature=0.7, response_mime_type="application/json")
             )
             
-            # Procesamos la respuesta JSON a un formato tabular de Python
+            # Guardamos los datos en la memoria de la sesión
             datos = json.loads(response.text)
-            df = pd.DataFrame(datos)
-            
-            st.success("¡Análisis completado con éxito!")
-            
-            # Mostramos la tabla interactiva
-            st.dataframe(
-                df,
-                column_config={
-                    "palabra_clave_sugerida": st.column_config.TextColumn("Palabra Clave", width="medium"),
-                    "angulo_diferenciador": st.column_config.TextColumn("Ángulo Diferenciador", width="medium"),
-                    "formato_ideal": st.column_config.TextColumn("Formato Sugerido", width="small"),
-                    "perfil_competidor_a_vencer": st.column_config.TextColumn("Debilidad Competitiva", width="medium"),
-                },
-                hide_index=True,
-                use_container_width=True
-            )
+            st.session_state.df_ideas = pd.DataFrame(datos)
+            st.success("¡Ideas generadas!")
             
         except Exception as e:
-            st.error(f"Ocurrió un error al procesar los datos: {e}")
+            st.error(f"Error en la IA: {e}")
+
+# Mostrar la tabla si existe en memoria
+if st.session_state.df_ideas is not None:
+    st.subheader("💡 Oportunidades Detectadas")
+    st.dataframe(st.session_state.df_ideas, hide_index=True, use_container_width=True)
+
+    st.divider()
+
+    # --- FASE 2: EXTRACCIÓN DE AMAZON ---
+    st.subheader("📊 Fase 2: Validar en Mercado Real (Amazon)")
+    st.markdown("Selecciona una palabra clave de la tabla superior para extraer los datos de sus competidores en la primera página de Amazon.")
+    
+    # Creamos un menú desplegable con las palabras clave generadas
+    lista_keywords = st.session_state.df_ideas['palabra_clave_sugerida'].tolist()
+    keyword_seleccionada = st.selectbox("Selecciona el nicho a validar:", lista_keywords)
+    
+    validar_btn = st.button("2. Extraer Datos de Amazon")
+    
+    if validar_btn:
+        with st.spinner(f"🕵️‍♂️ Simulando navegación humana en Amazon para: '{keyword_seleccionada}'..."):
+            
+            # Llamamos a la función de tu archivo scraper_amazon.py
+            resultados_amazon = buscar_en_amazon(keyword_seleccionada)
+            
+            if isinstance(resultados_amazon, dict) and "error" in resultados_amazon:
+                st.error(f"⚠️ Hubo un problema con la extracción: {resultados_amazon['error']}")
+                st.info("Nota: Si recibes el error 503, Amazon detectó que somos un bot. Intenta de nuevo en unos minutos.")
+            
+            elif isinstance(resultados_amazon, list) and len(resultados_amazon) > 0:
+                st.success("¡Extracción completada con éxito!")
+                df_amazon = pd.DataFrame(resultados_amazon)
+                
+                # Mostramos los resultados del scraper
+                col1, col2 = st.columns([2, 1])
+                with col1:
+                    st.dataframe(df_amazon, hide_index=True, use_container_width=True)
+                with col2:
+                    st.metric(label="Competidores Analizados", value=len(df_amazon))
+                    # Calculamos un promedio rápido de reseñas si los datos son válidos
+                    promedio_reseñas = df_amazon[df_amazon['Reseñas'] > 0]['Reseñas'].mean()
+                    st.metric(label="Promedio de Reseñas (Top 10)", value=f"{promedio_reseñas:.0f}" if pd.notna(promedio_reseñas) else "0")
+            else:
+                st.warning("No se encontraron resultados para esta búsqueda o Amazon bloqueó la vista.")
