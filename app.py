@@ -65,22 +65,37 @@ if st.session_state.df_ideas is not None:
     st.divider()
     st.subheader("📊 Fase 2: Validar en Amazon")
     
-    lista_keywords = st.session_state.df_ideas['palabra_clave_sugerida'].tolist()
-    keyword_seleccionada = st.selectbox("Selecciona el nicho a validar:", lista_keywords)
+    # 1. Agregamos el selector de modo de búsqueda
+    modo_busqueda = st.radio(
+        "¿Cómo quieres buscar a los competidores?",
+        ["Seleccionar de la tabla (IA)", "Escribir búsqueda manual"],
+        horizontal=True
+    )
+    
+    # 2. Mostramos el input correspondiente según lo que elijas
+    if modo_busqueda == "Seleccionar de la tabla (IA)":
+        lista_keywords = st.session_state.df_ideas['palabra_clave_sugerida'].tolist()
+        keyword_seleccionada = st.selectbox("Selecciona el nicho a validar:", lista_keywords)
+    else:
+        keyword_seleccionada = st.text_input("Escribe la palabra clave exacta (ej: mushroom coloring book for adults):")
     
     validar_btn = st.button("2. Extraer Datos")
     
+    # 3. Lógica de validación y extracción
     if validar_btn:
-        with st.spinner(f"🕵️‍♂️ Extrayendo datos de Amazon para: '{keyword_seleccionada}'..."):
-            
-            # Pasamos la palabra clave Y la clave de ScraperAPI
-            resultados_amazon = buscar_en_amazon(keyword_seleccionada, api_key_scraper)
-            
-            if isinstance(resultados_amazon, dict) and "error" in resultados_amazon:
-                st.error(f"⚠️ Error de extracción: {resultados_amazon['error']}")
-            elif isinstance(resultados_amazon, list) and len(resultados_amazon) > 0:
-                st.success("¡Extracción completada!")
-                df_amazon = pd.DataFrame(resultados_amazon)
-                st.dataframe(df_amazon, hide_index=True, use_container_width=True)
-            else:
-                st.warning("No se encontraron resultados.")
+        if not keyword_seleccionada.strip():
+            st.warning("⚠️ Por favor, ingresa o selecciona una palabra clave antes de extraer los datos.")
+        else:
+            with st.spinner(f"🕵️‍♂️ Extrayendo datos de Amazon para: '{keyword_seleccionada}'..."):
+                
+                # Pasamos la palabra clave Y la clave de ScraperAPI
+                resultados_amazon = buscar_en_amazon(keyword_seleccionada, api_key_scraper)
+                
+                if isinstance(resultados_amazon, dict) and "error" in resultados_amazon:
+                    st.error(f"⚠️ Error de extracción: {resultados_amazon['error']}")
+                elif isinstance(resultados_amazon, list) and len(resultados_amazon) > 0:
+                    st.success("¡Extracción completada!")
+                    df_amazon = pd.DataFrame(resultados_amazon)
+                    st.dataframe(df_amazon, hide_index=True, use_container_width=True)
+                else:
+                    st.warning("No se encontraron resultados para esta búsqueda.")
