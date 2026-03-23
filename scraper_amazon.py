@@ -1,6 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
-import pandas as pd
+import re
 
 def buscar_en_amazon(palabra_clave, scraper_api_key):
     """
@@ -27,18 +27,39 @@ def buscar_en_amazon(palabra_clave, scraper_api_key):
         resultados = []
         
         for libro in libros[:10]:
+            # 1. Extraer Título
             titulo_tag = libro.find('h2')
             titulo = titulo_tag.text.strip() if titulo_tag else "Sin título"
             
-            reseñas_tag = libro.find('span', {'class': 'a-size-base s-underline-text'})
-            reseñas = reseñas_tag.text.strip().replace(',', '') if reseñas_tag else "0"
-            
+            # 2. Extraer Precio (Busca el primer precio visible)
             precio_tag = libro.find('span', {'class': 'a-offscreen'})
             precio = precio_tag.text.strip() if precio_tag else "No disponible"
             
+            # 3. EXTRACCIÓN AVANZADA DE RESEÑAS
+            reseñas = 0
+            
+            # Intento A: La etiqueta clásica de texto subrayado
+            reseñas_tag = libro.find('span', {'class': 'a-size-base s-underline-text'})
+            if reseñas_tag:
+                texto_limpio = re.sub(r'\D', '', reseñas_tag.text) # Extrae solo números
+                if texto_limpio.isdigit():
+                    reseñas = int(texto_limpio)
+            
+            # Intento B: Si el A falla, busca en los enlaces de reseñas de clientes
+            if reseñas == 0:
+                links = libro.find_all('a')
+                for a in links:
+                    if a.has_attr('href') and 'customerReviews' in a['href']:
+                        span_texto = a.find('span', {'class': 'a-size-base'})
+                        if span_texto:
+                            texto_limpio = re.sub(r'\D', '', span_texto.text)
+                            if texto_limpio.isdigit():
+                                reseñas = int(texto_limpio)
+                                break
+            
             resultados.append({
                 "Título": titulo,
-                "Reseñas": int(reseñas) if reseñas.isdigit() else 0,
+                "Reseñas": reseñas,
                 "Precio": precio
             })
             
