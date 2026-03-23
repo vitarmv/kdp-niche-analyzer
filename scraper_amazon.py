@@ -31,32 +31,32 @@ def buscar_en_amazon(palabra_clave, scraper_api_key):
             titulo_tag = libro.find('h2')
             titulo = titulo_tag.text.strip() if titulo_tag else "Sin título"
             
-            # 2. Extraer Precio (Busca el primer precio visible)
+            # 2. Extraer Precio
             precio_tag = libro.find('span', {'class': 'a-offscreen'})
             precio = precio_tag.text.strip() if precio_tag else "No disponible"
             
-            # 3. EXTRACCIÓN AVANZADA DE RESEÑAS
+            # 3. EXTRACCIÓN AGRESIVA DE RESEÑAS (Buscando en atributos ocultos)
             reseñas = 0
             
-            # Intento A: La etiqueta clásica de texto subrayado
-            reseñas_tag = libro.find('span', {'class': 'a-size-base s-underline-text'})
-            if reseñas_tag:
-                texto_limpio = re.sub(r'\D', '', reseñas_tag.text) # Extrae solo números
-                if texto_limpio.isdigit():
-                    reseñas = int(texto_limpio)
+            # Estrategia Principal: Buscar en los atributos 'aria-label'
+            etiquetas_span = libro.find_all('span')
+            for span in etiquetas_span:
+                aria = span.get('aria-label', '').lower()
+                # Buscamos palabras clave en inglés (ScraperAPI usa IP de USA) o español
+                if 'rating' in aria or 'calificaciones' in aria or 'evaluaciones' in aria:
+                    texto_limpio = re.sub(r'\D', '', aria) # Limpia todo y deja solo los números
+                    if texto_limpio.isdigit():
+                        reseñas = int(texto_limpio)
+                        break # Si lo encuentra, detiene la búsqueda para este libro
             
-            # Intento B: Si el A falla, busca en los enlaces de reseñas de clientes
+            # Fallback: Si no había aria-label, intenta la clase clásica
             if reseñas == 0:
-                links = libro.find_all('a')
-                for a in links:
-                    if a.has_attr('href') and 'customerReviews' in a['href']:
-                        span_texto = a.find('span', {'class': 'a-size-base'})
-                        if span_texto:
-                            texto_limpio = re.sub(r'\D', '', span_texto.text)
-                            if texto_limpio.isdigit():
-                                reseñas = int(texto_limpio)
-                                break
-            
+                reseñas_tag = libro.find('span', {'class': 'a-size-base s-underline-text'})
+                if reseñas_tag:
+                    texto_limpio = re.sub(r'\D', '', reseñas_tag.text)
+                    if texto_limpio.isdigit():
+                        reseñas = int(texto_limpio)
+
             resultados.append({
                 "Título": titulo,
                 "Reseñas": reseñas,
